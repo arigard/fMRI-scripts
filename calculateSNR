@@ -1,0 +1,54 @@
+#####################Calculate SNR#################
+##to make sure that we are included data with good SNR in regions where signal dropout is high (i.e., amygdala, ventral striatum), 
+##we need to calculate the SNR in the amygdala ROI and an ROI that is outside the brain. We could also calculate the SNR for an ROI
+##that we expect to have high SNR (e.g., occipital gyri)
+##this script takes a list of subjects and calculates SNR from three ROIs for each subject
+##consistent with Hariri lab, we rely on the normalized but unsmoothed images from each subject
+
+#!/bin/bash
+# set directories that we need
+root=xxxx
+snrscripts=$root/faces_analyses_mb/faces_scripts/SNR
+SNR_FILE=$snrscripts/snrfaces.txt
+
+# set paths to mask directories
+AMY_ATLAS=$root/faces_analyses_mb/masks/AAL_BiAmy_PickAtlas.nii
+AMYCM_ATLAS=$root/faces_analyses_mb/masks/ROI_AmygCM.nii
+AMYBL_ATLAS=$root/faces_analyses_mb/masks/ROI_AmygLB.nii
+AMYSF_ATLAS=$root/faces_analyses_mb/masks/ROI_AmygSF.nii
+BI_MOG_ATLAS=$root/faces_analyses_mb/masks/bi_mid_occip_gyrus.nii
+
+# create an empty file with a header to store output into
+echo -e 'SUBJECT\tAMY_SNR\tAMYCM_SNR\tAMYBL_SNR\tAMYSF_SNR\tMOG_SNR\tNOISE_SNR' > $SNR_FILE #note that this re-writes anything existing in the file
+
+cd $root
+# create a bash variable with all possible subjects (i.e., people with mri folders)
+subjects=$(ls -d lwh*[Tt][12]*)
+# subjects='lwh15twi00134t1_04483'' ''lwh15twi00134t2_04484' #for testing a few subs
+
+for subject in $subjects ; do
+	if [ -s $subject/func/faces/run_01/wutrun_01.nii ]; then # only look at the subject if they have normalized images
+		cd $root/$subject/func/faces/run_01 
+		3dTstat -cvarinvNOD wutrun_01.nii # calculate SNR across all voxels in the brain --> this saves ./stat+tlrc.BRIK 
+		3dresample -master stat+tlrc -input $AMY_ATLAS -prefix amygresample.nii # resample amygdala and middle occipital gyrus masks
+		3dresample -master stat+tlrc -input $AMYCM_ATLAS -prefix amygcmresample.nii # resample amygdala and middle occipital gyrus masks
+		3dresample -master stat+tlrc -input $AMYBL_ATLAS -prefix amygblresample.nii # resample amygdala and middle occipital gyrus masks
+		3dresample -master stat+tlrc -input $AMYSF_ATLAS -prefix amygsfresample.nii # resample amygdala and middle occipital gyrus masks		
+		3dresample -master stat+tlrc -input $BI_MOG_ATLAS -prefix mogresample.nii # resample amygdala and middle occipital gyrus masks 
+		echo 70 70 70 | 3dUndump -prefix noiseroi -srad 5 -orient LPI -master stat+tlrc -xyz - # create noise ROI 
+		AMY_SNR=$(3dmaskave -mask amygresample.nii -quiet stat+tlrc) # calculate SNR within each ROI and save as a variable
+		AMYCM_SNR=$(3dmaskave -mask amygcmresample.nii -quiet stat+tlrc) # calculate SNR within each ROI and save as a variable
+		AMYBL_SNR=$(3dmaskave -mask amygblresample.nii -quiet stat+tlrc) # calculate SNR within each ROI and save as a variable
+		AMYSF_SNR=$(3dmaskave -mask amygsfresample.nii -quiet stat+tlrc) # calculate SNR within each ROI and save as a variable
+		MOG_SNR=$(3dmaskave -mask mogresample.nii -quiet stat+tlrc) # calculate SNR within each ROI and save as a variable
+		NOISE_SNR=$(3dmaskave -mask noiseroi+tlrc -quiet stat+tlrc) # calculate SNR within each ROI and save as a variable
+        echo -e "$subject\t$AMY_SNR\t$AMYCM_SNR\t$AMYBL_SNR\t$AMYSF_SNR\t$MOG_SNR\t$NOISE_SNR" >> $SNR_FILE # Append output on one line separated by tabs    
+    else
+        # people without wutruns
+        echo "$subject" >> $snrscripts/nowutruns.txt
+    fi
+	cd $root
+done
+
+# change permission for group rights
+chmod g+w $SNR_FILE $snrscripts/nowutruns.txt
