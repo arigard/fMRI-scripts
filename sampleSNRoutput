@@ -1,0 +1,8 @@
+### sample output file - named 'snrfaces.txt'
+
+SUBJECT	AMY_SNR	AMYCM_SNR	AMYBL_SNR	AMYSF_SNR	MOG_SNR	NOISE_SNR
+lwh15twi00134t2_04484	28.7045	28.7145	31.6639	24.8223	52.8822	4.63493
+
+### sample output file - named 'nowutruns.txt' --> these subs did not have raw files needed to calculate SNR
+lwh15twi00134t1_04483
+lwh15twi00134t2_04484_test 
